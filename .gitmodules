@@ -1,0 +1,3 @@
+[submodule "submodules/psutil"]
+	path = submodules/psutil
+	url = https://github.com/gopass2002/psutil

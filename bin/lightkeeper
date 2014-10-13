@@ -1,0 +1,35 @@
+#!/usr/bin/env python
+import os, sys
+import encodings.idna
+import pharos
+
+PYTHONPATH = '/pharos/usr/lib/python2.7/site-packages'
+
+if __name__ == '__main__':
+    host = 'localhost'
+    try:
+        # get host docker0 bridge ip: ex->172.17.42.1
+        host = os.environ['BRIDGE_IP']
+    except KeyError:
+        host = '172.17.42.1'
+
+    os.chroot('/pharos')
+    
+    while True:
+        client = pharos.PharosClient(host)
+        containers = client.containers()
+        #print containers
+        for container in containers:
+            metric = container.get_metric()
+            print metric
+            #for proc in container.get_processes():
+            #    print proc.get_metric()
+        '''
+        pids = client.pids('1c4056cf566f')
+        print len(pids)
+        metrics = []
+        for pid in pids:
+            metrics.append(client.get_process(pids[0]).get_metric())
+        print metrics
+        '''
+        exit(0)
