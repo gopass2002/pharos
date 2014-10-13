@@ -5,7 +5,7 @@ setup(
     version='0.1',
     packages=['pharos'],
     package_dir={'pharos': 'src/python/pharos'},
-    install_requires=['docker-py', 'pymongo', 'flask'],
+    install_requires=['docker-py', 'pymongo', 'psutil', 'numpy', 'flask'],
 
     author='DockerKorea',
     author_email='gopass2002@gmail.com',
