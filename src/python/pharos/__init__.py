@@ -17,7 +17,6 @@ CMD = 7
 
 class PharosClient(object):
     def __init__(self, host='172.17.42.1', docker_port=2375, mongodb_port=27017):
-        print host, docker_port, mongodb_port
         self.docker_c = docker.Client('tcp://%s:%i' % (host, docker_port))
         self.mongo_c = pymongo.MongoClient(host, mongodb_port)
 
