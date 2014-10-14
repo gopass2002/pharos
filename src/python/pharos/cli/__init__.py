@@ -1,7 +1,7 @@
 import os
 import sys
 
-__all__ = ['lightkeeper']
+__all__ = ['lightkeeper', 'node']
 
 def progname(module, command):
     module_name = module.split('.')[-1]

@@ -22,12 +22,13 @@ def main(args):
     except KeyError:
         host = '172.17.42.1'
 
+    hostname = socket.gethostname()
     if os.path.exists('/.dockerinit'):
         # in docker container, change root directory
+        hostname = os.environ['DOCKER_HOST']
         os.chroot('/pharos')
     mongo = pymongo.MongoClient(host, args.mongos_port)
     metrics_col = mongo.pharos.metrics
-    hostname = socket.gethostname()
 
     while True:
         client = pharos.PharosClient(host)

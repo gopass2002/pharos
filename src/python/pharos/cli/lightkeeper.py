@@ -1,6 +1,5 @@
-import argparse
+import argparse, os, socket
 import pharos.cli
-import os
 from pharos.cli import cmd
 
 run_parser = argparse.ArgumentParser()
@@ -8,6 +7,7 @@ run_parser.add_argument('-d', '--docker', action='store_true', help='run docker 
 @cmd(run_parser)
 def run(args):
     'run lightkeeper daemons'
-    cmd = 'docker run -d --privileged=true -v /proc:/pharos/proc pharos'
+    hostname = socket.gethostname()
+    cmd = 'docker run -d --privileged=true -e DOCKER_HOST=%s -v /proc:/pharos/proc pharos' % (hostname)
     print cmd
     os.system(cmd)
