@@ -5,30 +5,34 @@ import psutil
 import docker
 import pymongo
 
-PYTHONPATH = '/pharos/usr/lib/python2.7/site-packages'
-USER = 0
-PID = 1
-PPID = 2
-C = 3
-STIME = 4
-TTY = 5
-TIME = 6
-CMD = 7
-
 class PharosClient(object):
     def __init__(self, host='172.17.42.1', docker_port=2375, mongodb_port=27017):
         self.docker_c = docker.Client('tcp://%s:%i' % (host, docker_port))
-        self.mongo_c = pymongo.MongoClient(host, mongodb_port)
 
     def containers(self):
         return [Container(status, self.docker_c) for status in self.docker_c.containers()]
+
+    def kill_container(self, container):
+        pass
+
+    def stop_container(self, container):
+        pass
+
+    def inspect_container(self, container):
+        pass
+
+    def start_container(self, continer):
+        pass
+
+    def assign_ip_container(self, container):
+        pass
 
 class Container(object):
     def __init__(self, status, docker_client):
         self.docker_c =  docker_client
         self.id = status['Id']
         self.status = status['Status']
-        self.name = status['Names']
+        self.name = status['Names'][0]
         self.image = status['Image']
     
     def pids(self):
@@ -49,7 +53,7 @@ class Container(object):
         return str({'id': self.id, 'status': self.status, 'name': self.name, 'image': self.image})
 
     def __repr__(self):
-        return '<%s at %s>' % (self.__str__(), id(self))
+        return self.__str__()
 
 class Process(object):
     def __init__(self, pid):
@@ -60,13 +64,17 @@ class Process(object):
         self.name = self.proc.name()
     
     def get_metric(self):
-        proc = self.proc
-        cpu_percent = proc.cpu_percent()
-        cpu_times = proc.cpu_times()
-        mem_percent = proc.memory_percent()
-        mem_info = proc.memory_info()
-        io_counters = proc.io_counters()
-        net_counters = self.net_io_counters()
+        try:
+            proc = self.proc
+            cpu_percent = proc.cpu_percent()
+            cpu_times = proc.cpu_times()
+            mem_percent = proc.memory_percent()
+            mem_info = proc.memory_info()
+            io_counters = proc.io_counters()
+            net_counters = self.net_io_counters()
+        except psutil.AccessDenied:
+            print 'Could not access /proc/%s are you root?' % self.pid
+            exit(1)
 
         metric = [
             cpu_percent, cpu_times[0], cpu_times[1],
