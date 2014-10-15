@@ -35,12 +35,11 @@ def main(args):
         containers = client.containers()
         
         for container in containers:
-            query = {'hostname': hostname, 'id': container.id, 'image': container.image,
+            rec = {'hostname': hostname, 'id': container.id, 'image': container.image,
                 'status': container.status, 'name': container.name}
             metric = container.get_metric()
-            query['metrics'] = list(container.get_metric())
-            metrics_col.update({'id': container.id}, query, True)
-        exit(0)
+            rec['metrics'] = list(container.get_metric())
+            metrics_col.update({'id': container.id}, rec, True)
         time.sleep(args.interval)
     
 if __name__ == '__main__':

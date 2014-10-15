@@ -1,7 +1,8 @@
 import os
 import sys
+import fcntl, termios, struct
 
-__all__ = ['lightkeeper', 'node']
+__all__ = ['lightkeeper', 'node', 'server']
 
 def progname(module, command):
     module_name = module.split('.')[-1]
@@ -30,6 +31,23 @@ def cmd(parser):
         return CommandWrapper(parser, func)
     return decorator
 
+def terminal_size():
+    h, w, hp, wp = struct.unpack('HHHH',
+        fcntl.ioctl(0, termios.TIOCGWINSZ,
+        struct.pack('HHHH', 0, 0, 0, 0)))
+    return w, h
+
+def print_divider(char='-'):
+    max_w, max_h = terminal_size()
+    print char * max_w
+
+def print_line(line):
+    max_w, max_h = terminal_size()
+    if len(line) > max_w:
+        print line[:max_w]
+    else:
+        print line
+
 def format_lines(lines, rjust = True):
     maxlens = [0 for _ in lines[0]]
     for line in lines:
@@ -44,4 +62,4 @@ def format_lines(lines, rjust = True):
                 print column.rjust(maxlens[idx] + 1)
             else:
                 print column.ljust(maxlens[idx] + 1)
-        print
+    print

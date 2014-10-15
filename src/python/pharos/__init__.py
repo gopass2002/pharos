@@ -5,8 +5,38 @@ import psutil
 import docker
 import pymongo
 
+# configuration field headers
+DOCKER_PORT = 'DOCKER_PORT'
+MONGOS_PORT = 'MONGOS_PORT'
+DOCKER_BRIDGE = 'DOCKER_BRIDGE'
+CONFIG_FIELDS = (DOCKER_PORT, MONGOS_PORT, DOCKER_BRIDGE)
+
+
+# TODO define default configuation
+DEFAULT_CONFIG = {
+        DOCKER_PORT: 2375,
+        MONGOS_PORT: 27017,
+        DOCKER_BRIDGE: '172.17.42.1'
+    }
+
+def read_local_configuration(path=None):
+    if path is None:
+        try:
+            path = os.environ['PHAROS_CONFIG']
+            # path = os.environ['PHAROS_HOME']
+        except KeyError:
+            # TODO implement: read default configuration
+            pass
+
+def get_preference(field):
+    return DEFAULT_CONFIG[field]
+    # TODO implements
+
 class PharosClient(object):
-    def __init__(self, host='172.17.42.1', docker_port=2375, mongodb_port=27017):
+    def __init__(self, host=DOCKER_BRIDGE, 
+        docker_port=get_preference(DOCKER_PORT), 
+        mongodb_port=get_preference(MONGOS_PORT)):
+
         self.docker_c = docker.Client('tcp://%s:%i' % (host, docker_port))
 
     def containers(self):
