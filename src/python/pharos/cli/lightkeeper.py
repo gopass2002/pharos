@@ -14,8 +14,7 @@ def run(args):
         c.inspect_container('pharos-lightkeeper')
         c.restart('pharos-lightkeeper')
     except docker.errors.APIError:
-        cmd = 'docker run -d --privileged=true --name=pharos-lightkeeper -e DOCKER_HOST=%s -v /proc:/pharos/proc pharos' % (
-            hostname)
+        cmd = 'docker run -d --net=host --privileged=true --name=pharos-lightkeeper -v /proc:/pharos/proc pharos'
         print cmd
         os.system(cmd)
             
