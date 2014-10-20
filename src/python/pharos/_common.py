@@ -2,6 +2,7 @@ import os
 import yaml
 
 # configuration field headers
+REMOTE_API_HOST = 'remote_api_host',
 REMOTE_API_PORT = 'remote_api_port',
 LIGHTTOWER_PORT = 'lighttower_port',
 DOCKER_BRIDGE = 'docker_bridge'
@@ -9,12 +10,13 @@ DOCKER_PORT = 'docker_port'
 DOCKER_API_VERSION = 'docker_api_version'
 MONGOS_PORT = 'mongo_port'
 CONFIG_FIELDS = (
-    REMOTE_API_PORT, LIGHTTOWER_PORT,
+    REMOTE_API_HOST, REMOTE_API_PORT, LIGHTTOWER_PORT,
     DOCKER_BRIDGE, DOCKER_PORT, DOCKER_API_VERSION, MONGOS_PORT,)
 
 
 # TODO define: default configuation
 DEFAULT_CONFIG = {
+        REMOTE_API_HOST: 'localhost',
         REMOTE_API_PORT: 8008,
         LIGHTTOWER_PORT: 4242,
         DOCKER_BRIDGE: '172.17.42.1',

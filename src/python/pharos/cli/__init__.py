@@ -59,7 +59,7 @@ def format_lines(lines, rjust = True):
         for idx, column in enumerate(line):
             if column is None: continue
             if rjust:
-                print column.rjust(maxlens[idx] + 1)
+                print column.rjust(maxlens[idx] + 1),
             else:
-                print column.ljust(maxlens[idx] + 1)
-    print
+                print column.ljust(maxlens[idx] + 1),
+        print

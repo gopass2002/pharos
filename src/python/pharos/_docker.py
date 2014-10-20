@@ -20,12 +20,21 @@ class Container(dict):
         return Process(pid)
 
     def processes(self):
-        return [Process(pid) for pid in self.pids()]
+        procs = []
+        for pid in self.pids():
+            try:
+                p = Process(pid)
+            except psutil.NoSuchProcess:
+                continue
+            procs.append(p)
+        return procs
 
     def metrics(self, processes=None):
         if not processes:
             processes = self.processes()
         metrics = [process.metrics() for process in processes]
+        if len(metrics) == 0:
+            return [0.0] * 10
         return list(numpy.sum(metrics, axis=0))
 
 class Process(dict):

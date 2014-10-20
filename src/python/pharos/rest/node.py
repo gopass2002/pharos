@@ -10,8 +10,11 @@ class AlreadyExists(InvalidUsage):
     def __init__(self, record, status_code=None, payload=None):
         InvalidUsage.__init__(self, 'Already Exists: ' + repr(record), status_code, payload)
 
+class NotFoundRecord(InvalidUsage):
+    def __init__(self, recode, status_code=None, payload=None):
+        InvalidUsage.__init__(self, 'Not Found Record: ' + repr(recode), status_code, payload)
 
-@app.route('/node', methods=['GET', 'POST'])
+@app.route('/node', methods=['GET', 'POST', 'DELETE'])
 def list_node():
     c = pymongo.MongoClient('localhost:27017') 
     if request.method == 'POST':
@@ -26,6 +29,14 @@ def list_node():
             pass
         req['_id'] = str(req.pop('_id'))
         return flask.jsonify(req)
+    elif request.method == 'DELETE':
+        req = json.loads(request.data)
+        res = c.pharos.node.find_one(req)
+        if not res:
+            raise NotFoundRecord(res, status_code=404)
+        c.pharos.node.remove(res)
+        res['_id'] = str(res.pop('_id'))
+        return flask.jsonify(res)
 
     nodes = list(c.pharos.node.find())
     res = {'n': len(nodes)}

@@ -10,13 +10,12 @@ from pharos._node import NodeServer
 def light_up(args):
     hostname = socket.gethostname()
     host = hostname
-
+    port = args.port
     if os.path.exists('/.dockerinit'):
-        # in docker container, override ports and change root directory
-        pass
+        port = int(os.environ['LIGHTTOWER_PORT'])
 
     tower = zerorpc.Server(NodeServer(hostname))
-    tower.bind('tcp://0.0.0.0:%i' % args.port)
+    tower.bind('tcp://0.0.0.0:%i' % port)
     tower.run()
 
 if __name__ == '__main__':

@@ -6,8 +6,6 @@ from pharos._docker import *
 
 from pharos._common import (get_preference)
 from pharos._common import (LIGHTTOWER_PORT, DOCKER_PORT)
-import logging
-logging.basicConfig()
 
 class _Node(object):
     def __init__(self, host):
@@ -53,6 +51,8 @@ class NodeServer(_Node):
         if not containers:
             containers = self.containers()
         metrics = [container.metrics() for container in containers]
+        if len(metrics) == 0:
+            return [0.0] * 10
         return list(numpy.sum(metrics, axis=0))
 
     def container_metrics(self, container_id):
