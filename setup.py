@@ -1,12 +1,27 @@
-from setuptools import setup
+from setuptools import setup, find_packages
+
+pharos_src_home = 'src/python/pharos'
+
+with open('requirements.txt', 'r') as f:
+    requirements = [line.strip() for line in f.readlines()]
 
 setup(
     name='pharos',
     version='0.1',
-    packages=['pharos'],
-    package_dir={'pharos': 'src/python/pharos'},
-    install_requires=['docker-py', 'pymongo', 'psutil', 'numpy', 'flask'],
-
+    packages=['pharos', 'pharos._cli', 'pharos.rest', 'pharos.daemons'],
+    package_dir={
+        'pharos': pharos_src_home,
+        'pharos._cli': pharos_src_home + '/_cli',
+        'pharos.rest': pharos_src_home + '/rest',
+        'pharos.daemons': pharos_src_home + '/daemons'},
+    install_requires=requirements,
+    entry_points={'console_scripts': [
+        'pharos = pharos.cli:main',
+        'pharos-remote-server = pharos.daemons.remote_server:main',
+        'lighttower = pharos.daemons.lighttower:main',
+        'lightkeeper = pharos.daemons.lightkeeper:main']
+    },
+    zip_safe=False,
     author='DockerKorea',
     author_email='gopass2002@gmail.com',
     url='https://github.com/DockerKorea/pharos',

@@ -1,6 +1,5 @@
 import flask
-from pharos.rest import *
-import json
+from . import app
 
 @app.route('/containers')
 def list_containers():

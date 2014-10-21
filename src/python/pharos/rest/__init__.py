@@ -1,7 +1,6 @@
 import flask
-import pymongo
 
-__views__ = ['node', 'container']
+__VIEWS__ = ['node', 'container']
 app = flask.Flask(__name__)
 
 class InvalidUsage(Exception):

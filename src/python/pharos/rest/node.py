@@ -4,7 +4,10 @@ import flask
 from flask import request
 
 import pymongo
-from pharos.rest import *
+from . import (
+    InvalidUsage,
+    app
+)
 
 class AlreadyExists(InvalidUsage):
     def __init__(self, record, status_code=None, payload=None):

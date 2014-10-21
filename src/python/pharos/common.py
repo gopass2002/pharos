@@ -47,3 +47,9 @@ def get_preference(field):
         # TODO implement: custom exception class ex) InvaildField
         raise Exception('%s is not vaild field name' % field)
     return get_configuration()[field]
+
+def print_divider(divider='-'):
+    pass
+
+def print_line(line):
+    pass
