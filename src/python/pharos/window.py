@@ -4,6 +4,15 @@ import curses, atexit
 import psutil, numpy
 from datetime import datetime, timedelta
 
+from .common import (
+    get_preference
+)
+
+from .common import (
+    REMOTE_API_HOST,
+    REMOTE_API_PORT
+)
+
 class Screen(object):
     def __init__(self, console=False):
         self.console = console
@@ -84,14 +93,22 @@ class Top(Screen):
         self.host = host
 
     def start_display(self):
+        remote_host = get_preference(REMOTE_API_HOST)
+        remote_port = get_preference(REMOTE_API_PORT)
+        remote_url = 'http://%s:%i/node/%s/metrics' % (
+            get_preference(REMOTE_API_HOST),
+            get_preference(REMOTE_API_PORT),
+            self.host
+        )
+        print remote_url
         while True:
             try:
-                res = requests.get(url='http://localhost:8008/node/%s/metrics' % self.host)
+                res = requests.get(url=remote_url)
                 if res.status_code != 200:
                     # TODO: implement-> handle error codes
                     print 'error'
-                if res.json()['n'] == 0:
-                    return
+                #if res.json()['n'] == 0:
+                #    return
                 self.containers = res.json()['containers']
                 self.lineno = 0
                 self.refresh_screen()
@@ -105,10 +122,13 @@ class Top(Screen):
         self.printer('RESOURCE USAGE SUMMARY', highlight=True)
         self.printer(templ % ('HOSTNAME', self.host))
         self.printer(templ % ('CONTAINERS', str(len(metrics))))
-        
-        # sum by column
-        sum_metric = numpy.sum(metrics, axis=0)
-        
+       
+        if len(metrics) == 0:
+            sum_metric = [0.0] * 10
+        else: 
+            # sum by column
+            sum_metric = numpy.sum(metrics, axis=0)
+
         self.printer(templ % ('CPU', '%i%% (user: %i%% system: %i%%)' % (
             sum_metric[0], sum_metric[1], sum_metric[2])))
         self.printer(templ % ('MEMORY', '%i%% (rss: %s vms: %s)' % (

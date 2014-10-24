@@ -27,8 +27,7 @@ def run_cmd(args):
         print_help()
     else:
         func = commands[args[0]]
-        func.call(args[2:])
-
+        func.call(args[1:])
 
 def main():
     load_commands()

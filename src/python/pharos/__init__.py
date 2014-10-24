@@ -5,6 +5,8 @@ import mongodb as db
 
 from common import (get_configuration)
 
+__all__ = ['cli']
+
 _client = None
 
 def client():

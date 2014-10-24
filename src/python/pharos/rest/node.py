@@ -2,8 +2,13 @@ import json
 
 import flask
 from flask import request
-
+import requests
 import pymongo
+import docker
+
+from pharos.common import get_preference
+from pharos.common import DOCKER_PORT, MONGOS_PORT
+
 from . import (
     InvalidUsage,
     app
@@ -17,9 +22,34 @@ class NotFoundRecord(InvalidUsage):
     def __init__(self, recode, status_code=None, payload=None):
         InvalidUsage.__init__(self, 'Not Found Record: ' + repr(recode), status_code, payload)
 
+class StorageIsNotAvailable(InvalidUsage):
+    def __init__(self, storage, status_code=None, payload=None):
+        InvalidUsage.__init__(self, 'Storage is not available: ' + storage, status_code, payload)
+
+
+def get_containers_count(host, port):
+    'return count of containers if docker daemon is available'
+    docker_client = docker.Client('tcp://%s:%i' % (host, port), timeout=1)
+    try:
+        return len(docker_client.containers())
+    except requests.exceptions.ConnectionError:
+        return -1
+
+def check_storage_status(host, port):
+    'check storage is available'
+    # TODO check storage type
+    try:
+        c = pymongo.MongoClient('%s:%i' % (host, port), connectTimeoutMS=1000)
+        return True
+    except pymongo.errors.ConnectionFailure:
+        return False
+
 @app.route('/node', methods=['GET', 'POST', 'DELETE'])
 def list_node():
-    c = pymongo.MongoClient('localhost:27017') 
+    try:
+        c = pymongo.MongoClient('localhost:27017') 
+    except pymongo.errors.ConnectionFailure:
+        raise StorageIsNotAvailable('MongoDB', status_code=500)
     if request.method == 'POST':
         # insert new recode
         req = json.loads(request.data)
@@ -45,6 +75,10 @@ def list_node():
     res = {'n': len(nodes)}
     for node in nodes:
         node['_id'] = str(node.pop('_id'))
+        host = node['host']
+        # health check
+        node['containers'] = get_containers_count(host, get_preference(DOCKER_PORT))
+        node['storage'] = check_storage_status(host, get_preference(MONGOS_PORT))
     res['nodes'] = nodes
     return flask.jsonify(res)
 

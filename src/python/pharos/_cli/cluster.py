@@ -47,7 +47,7 @@ top_parser.add_argument('host', help='target host to display')
 def top(args):
     'display <host> container\'s metrics'
     host = _get_hostname(args.host)
-    from window import Top
+    from pharos.window import Top
     win = Top(host)
     win.start_display()
 
@@ -58,6 +58,7 @@ def list(args):
     'list nodes'
     base_url = get_base_url()
     url = base_url + '/node'
+    
     try:
         res = requests.get(url)
     except requests.exceptions.ConnectionError, e:
@@ -66,16 +67,27 @@ def list(args):
         exit(1)
 
     if res.status_code != 200:
-        print 'empty'
-
+        print 'Server Error[%i]: %s' % (res.json()['return_code'], res.json()['message'])
+        exit(0)
+    
     nodes = res.json()['nodes']
     print_divider('-')
-    templ = '%-30s %-20s %-20s'
-    header = ('ID', 'HOSTNAME', 'IP')
-    print_line(templ % header)
+    templ = '%-30s %-20s %-10s %-10s %-12s %-20s'
+    header = ('ID', 'HOSTNAME', 'DOCKER', 'STORAGE', 'CONTAINERS', 'IP')
+    print_line(templ % header, highlight=True)
     print_divider('-')
     for node in nodes:
-        print_line(templ % (node['_id'], node['host'], socket.gethostbyname(node['host'])))
+        containers = node['containers']
+        docker_health = 'GONE' if containers < 0 else 'OK'
+        storage_health = 'GONE' if not node['storage'] else 'OK'
+        print_line(templ % (
+            node['_id'], 
+            node['host'], 
+            docker_health,
+            storage_health,
+            containers,
+            socket.gethostbyname(node['host'])
+        ))
     print
 
 
