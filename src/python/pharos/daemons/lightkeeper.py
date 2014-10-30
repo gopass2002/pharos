@@ -1,7 +1,10 @@
 # default modules
-import os, sys, multiprocessing
+import os
+import sys
+import multiprocessing
 import socket
-import encodings.idna, json
+import encodings.idna
+import json
 import argparse
 import time
 
@@ -9,111 +12,137 @@ import time
 import docker
 import pymongo
 import numpy
+import zmq
+import zerorpc
 
-try:
-    from pharos import *
-    from pharos._node import NodeServer
-except ImportError:
-    # in host, add python paths
-    sys.path.append('../src/python')
-    from pharos import *
-    from pharos._node import NodeServer
+# pharos modules
+from pharos.common import (get_preference)
+from pharos.common import (
+    LIGHTTOWER_HOST, LIGHTTOWER_EVENT_COLLECT_PORT,
+    LIGHTKEEPER_RPC_PORT,
+    DOCKER_BRIDGE_IP, DOCKER_UNIX_SOCKET_PATH, DOCKER_REMOTE_API_PORT,
+    MONGOS_PORT,
+    METRICS_COLLECT_INTERVAL,
+)
 
-IGNORE_EVENTS = ('create', 'destroy', 'export', 'kill', 'stop')
-START_EVENTS = ('start', 'restart', 'unpause')
-END_EVENTS = ('die', 'pause')
+from pharos.node import NodeServer
 
-def monitor_events(mongos, hostname, host, port):
+def monitor_events(config, docker_client):
+    ctx = zmq.Context()
+    event_sock = ctx.socket(zmq.PUSH)
+    event_sock.connect('tcp://%s:%i' % (
+            config[LIGHTTOWER_HOST], config[LIGHTTOWER_EVENT_COLLECT_PORT]
+        )
+    )
+
     # container event monitor process
-    c = docker.Client('tcp://%s:%i' % (host, port))
-    event_col = mongos.pharos.events
-    con_col = mongos.pharos.container_metrics
-    try:
-        for e in c.events():
-            event = json.loads(e)
-            # status is 10 status
-            # (create, destroy, die, export, kill, pause, restart, start, stop, unpause)
-            status = event['status']
-            q = {'id': event['id']}
+    for e in docker_client.events():
+        print 'event:', e
+        event_sock.send(e)
 
-            # TODO hadle result ex-> when result['n'] < 1 or result['ok'] != 1
-            result = event_col.update(q, event, True)
+def start_rpc_service(config, docker_client):
+    tower = zerorpc.Server(NodeServer(docker_client), heartbeat=5)
+    tower.bind('tcp://*:%i' % config[LIGHTKEEPER_RPC_PORT])
+    tower.run()
 
-            # sync metrics -> remove existing records
-            if status in END_EVENTS:
-                # TODO hadle result ex-> when result['n'] < 1 or result['ok'] != 1
-                result = con_col.remove({'Id': event['id']})
-
-    except KeyboardInterrupt:
-        pass
-
-def run_lightkeeper(args):
-    hostname = socket.gethostname()
-    host = hostname
-    docker_port = args.docker_port
-    mongos_port = args.mongo_port
-
-    if os.path.exists('/.dockerinit'):
-        # in docker container, override ports and change root directory
-        hostname = os.environ['PHAROS_HOSTNAME']
-        host = os.environ['DOCKER_BRIDGE']
-        docker_port = int(os.environ['DOCKER_PORT'])
-        mongos_port = int(os.environ['MONGOS_PORT'])
-        os.chroot('/pharos')
-
-    node = NodeServer(host)
-    mongos = pymongo.MongoClient(host, mongos_port)
+def collect_metrics(config, docker_client, mongos, is_container):
+    node = NodeServer(docker_client)
+    hostname = config['hostname']
     container_col = mongos.pharos.container_metrics
     node_col = mongos.pharos.node_metrics
+    interval = config[METRICS_COLLECT_INTERVAL]
 
-    p = multiprocessing.Process(target=monitor_events, args=(mongos, hostname, host, docker_port))
-    p.start()
+    if is_container:
+        os.chroot('/pharos')
 
-    q = {'hostname': hostname}
-    try:
-        while True:
-            containers = node.containers()
-            node_doc = {'hostname': hostname, 'containers': []}
-            if len(containers) == 0:
-                # it is not running any container
-                node_metrics = [0.0] * 10
-                node_doc['metrics'] = node_metrics
-            else:
-                node_metrics = []
-                for container in containers:
-                    try:
-                        procs = container.processes()
-                    except docker.errors.APIError:
-                        continue
+    while True:
+        containers = node.containers()
+        node_doc = {'hostname': hostname, 'containers': []}
+        if len(containers) == 0:
+            # not exists running any container
+            node_metrics = [0.0] * 10
+            node_doc['metrics'] = node_metrics
+        else:
+            # collect container metrics
+            node_metrics = []
+            for container in containers:
+                try:
+                    procs = container.processes()
+                except docker.errors.APIError:
+                    continue
 
-                    # aggregate container metrics
-                    metrics = container.metrics(procs)
-                    doc = {'metrics': metrics}
+                # aggregate container metrics
+                metrics = container.metrics(procs)
+                doc = {'metrics': metrics}
 
-                    # add container status
-                    doc.update(container)
-                    node_doc['containers'].append(doc)
-                    doc['processes'] = procs
+                # add container status
+                doc.update(container)
+                node_doc['containers'].append(doc)
+                doc['processes'] = procs
 
-                    # insert container metrics to mongodb
-                    container_col.update({'Id': container['Id']},doc, True)
-                    node_metrics.append(metrics)
+                # update container metrics to mongodb
+                container_col.update({'Id': container['Id']},doc, True)
+                node_metrics.append(metrics)
 
+            try:
                 node_doc['metrics'] = list(numpy.sum(node_metrics, axis=0))
-            node_col.update({'hostname': hostname}, node_doc, True)
+            except TypeError:
+                print node_metrics
+                exit(1)
+        # update node metrics to mongodb
+        node_col.update({'hostname': hostname}, node_doc, True)
 
-            # sleep interval(default=1)
-            time.sleep(args.interval)
-    except KeyboardInterrupt:
-        if p.is_alive():
-            p.terminate()
-        print 'good bye'
+        # sleep interval(default=1)
+        time.sleep(interval)
+
+
+def run_lightkeeper():
+    is_container = os.path.exists('/.dockerinit')
+    config = {}
+    if is_container:
+        # in docker container, override ports and change root directory
+        config['hostname'] = os.environ['EXT_HOSTNAME']
+        config[LIGHTTOWER_HOST] = os.environ['LIGHTTOWER_HOST']
+        config[LIGHTTOWER_EVENT_COLLECT_PORT] = int(os.environ['LIGHTTOWER_EVENT_COLLECT_PORT'])
+        config[LIGHTKEEPER_RPC_PORT] = int(os.environ['LIGHTKEEPER_RPC_PORT'])
+        config[DOCKER_BRIDGE_IP] = os.environ['DOCKER_BRIDGE_IP']
+        config[DOCKER_REMOTE_API_PORT] = int(os.environ['DOCKER_REMOTE_API_PORT'])
+        #config[DOCKER_UNIX_SOCKET_PATH] = os.environ['DOCKER_UNIX_SOCKET_PATH']
+        config[MONGOS_PORT] = int(os.environ['MONGOS_PORT'])
+        config[METRICS_COLLECT_INTERVAL] = int(os.environ['METRICS_COLLECT_INTERVAL'])
+    else:
+        config['hostname'] = socket.gethostname()
+        config[LIGHTTOWER_HOST] = get_preference(LIGHTTOWER_HOST)
+        config[LIGHTTOWER_EVENT_COLLECT_PORT] = get_preference(LIGHTTOWER_EVENT_COLLECT_PORT)
+        config[LIGHTKEEPER_RPC_PORT] = get_preference(LIGHTKEEPER_RPC_PORT)
+        config[DOCKER_BRIDGE_IP] = get_preference(DOCKER_BRIDGE_IP)
+        config[DOCKER_REMOTE_API_PORT] = get_preference(DOCKER_REMOTE_API_PORT)
+        #config[DOCKER_UNIX_SOCKET_PATH] = get_preference(DOCKER_UNIX_SOCKET_PATH)
+        config[MONGOS_PORT] = get_preference(MONGOS_PORT)
+        config[METRICS_COLLECT_INTERVAL] = get_preference(METRICS_COLLECT_INTERVAL)
+
+    #docker_client = docker.Client('unix://%s' % config[DOCKER_UNIX_SOCKET_PATH])
+    docker_client = docker.Client('tcp://%s:%i' % (config[DOCKER_BRIDGE_IP], config[DOCKER_REMOTE_API_PORT])) 
+    mongos_client = pymongo.MongoClient(config[DOCKER_BRIDGE_IP], config[MONGOS_PORT])
+
+    event_monitor = multiprocessing.Process(target=monitor_events, args=(config, docker_client))
+    event_monitor.daemon = True
+    event_monitor.start()
+
+    rpc_server = multiprocessing.Process(target=start_rpc_service, args=(config, docker_client))
+    rpc_server.daemon = True
+    rpc_server.start()
+    
+    collector = multiprocessing.Process(target=collect_metrics, args=(config, docker_client, mongos_client, is_container))
+    collector.daemon = True
+    collector.start()
+
+    interval = config[METRICS_COLLECT_INTERVAL]
+    
+    while collector.is_alive() and event_monitor.is_alive() and rpc_server.is_alive():
+        collector.join(interval)
+        event_monitor.join(interval)
+        rpc_server.join(interval)
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--interval', type=int, default=1, help='collect metrics interval')
-    parser.add_argument('--mongo_port', type=int, default=27017, help='mongos port')
-    parser.add_argument('--docker_port', type=int, default=2375, help='docker port')
-    args = parser.parse_args()
-
-    run_lightkeeper(args)
+    run_lightkeeper()

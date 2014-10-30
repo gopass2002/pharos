@@ -1,3 +1,3 @@
 #!/bin/bash
 
-docker build -t pharos .
+docker build -t gopass2002/pharos .

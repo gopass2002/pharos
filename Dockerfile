@@ -18,4 +18,4 @@ ADD . /pharos/.
 # export PYTHONPATH
 ENV PYTHONPATH /pharos/src/python:/pharos/usr/lib/python2.7/site-packages
 
-CMD /pharos/sbin/run.sh
+CMD /pharos/bin/lightkeeper

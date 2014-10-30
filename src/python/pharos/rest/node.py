@@ -1,13 +1,20 @@
+# default modules
 import json
+import socket
 
+# 3rd party modules
 import flask
 from flask import request
 import requests
 import pymongo
 import docker
 
+# pharos modules
 from pharos.common import get_preference
-from pharos.common import DOCKER_PORT, MONGOS_PORT
+from pharos.common import (
+    DOCKER_REMOTE_API_PORT,
+    MONGOS_PORT
+)
 
 from . import (
     InvalidUsage,
@@ -77,19 +84,19 @@ def list_node():
         node['_id'] = str(node.pop('_id'))
         host = node['host']
         # health check
-        node['containers'] = get_containers_count(host, get_preference(DOCKER_PORT))
+        node['containers'] = get_containers_count(host, get_preference(DOCKER_REMOTE_API_PORT))
         node['storage'] = check_storage_status(host, get_preference(MONGOS_PORT))
     res['nodes'] = nodes
     return flask.jsonify(res)
 
 @app.route('/node/<host>/metrics', methods=['GET'])
 def metrics_node(host=None):
-    c = pymongo.MongoClient('localhost:27017')
+    c = pymongo.MongoClient('%s:%i' % (socket.gethostname(), get_preference(MONGOS_PORT)))
     q = {'hostname': host}
-    containers = list(c.pharos.metrics.find(q))
-    res = {'n': len(containers)}
-    for container in containers:
-        container['_id'] = str(container.pop('_id'))
-    
-    res['containers'] = containers
+    res = c.pharos.node_metrics.find_one(q)
+    res['_id'] = str(res.pop('_id'))
     return flask.jsonify(res)
+
+@app.route('/containers/<container_id>/metrics', methods=['GET'])
+def metrics_container(container_id):
+    pass

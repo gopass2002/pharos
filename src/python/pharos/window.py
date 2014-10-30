@@ -1,7 +1,8 @@
 import json, os, sys, string, time
 import requests
 import curses, atexit
-import psutil, numpy
+import psutil
+from numpy import array
 from datetime import datetime, timedelta
 
 from .common import (
@@ -9,8 +10,8 @@ from .common import (
 )
 
 from .common import (
-    REMOTE_API_HOST,
-    REMOTE_API_PORT
+    LIGHTTOWER_HOST,
+    LIGHTTOWER_REMOTE_API_PORT,
 )
 
 class Screen(object):
@@ -86,18 +87,18 @@ def bytes2human(n, postfix=''):
     return '%sB%s' % (n, postfix)
 
 
-class Top(Screen):
+class NodeTop(Screen):
     def __init__(self, host, interval=1):
-        Screen.__init__(self)
+        Screen.__init__(self, console=True)
         self.interval = interval
         self.host = host
+        self.node_metrics_before = None
+        self.container_metrics_before = {}
 
     def start_display(self):
-        remote_host = get_preference(REMOTE_API_HOST)
-        remote_port = get_preference(REMOTE_API_PORT)
         remote_url = 'http://%s:%i/node/%s/metrics' % (
-            get_preference(REMOTE_API_HOST),
-            get_preference(REMOTE_API_PORT),
+            get_preference(LIGHTTOWER_HOST),
+            get_preference(LIGHTTOWER_REMOTE_API_PORT),
             self.host
         )
         print remote_url
@@ -107,9 +108,10 @@ class Top(Screen):
                 if res.status_code != 200:
                     # TODO: implement-> handle error codes
                     print 'error'
-                #if res.json()['n'] == 0:
-                #    return
-                self.containers = res.json()['containers']
+                
+                self.node = res.json()
+                print self.node['metrics']
+                self.containers = self.node['containers']
                 self.lineno = 0
                 self.refresh_screen()
                 time.sleep(self.interval)
@@ -117,44 +119,166 @@ class Top(Screen):
                 break
     
     def header(self):
-        metrics = [container['metrics'] for container in self.containers]
+        metrics = self.node['metrics']
         templ = ' %-20s: %s'
         self.printer('RESOURCE USAGE SUMMARY', highlight=True)
         self.printer(templ % ('HOSTNAME', self.host))
-        self.printer(templ % ('CONTAINERS', str(len(metrics))))
-       
-        if len(metrics) == 0:
-            sum_metric = [0.0] * 10
-        else: 
-            # sum by column
-            sum_metric = numpy.sum(metrics, axis=0)
+        self.printer(templ % ('CONTAINERS', str(len(self.containers))))
+        
+        delta = None
+        if self.node_metrics_before:
+            delta = array(metrics) - array(self.node_metrics_before)
+        else:
+            delta = [0.0] * 10
+        self.node_metrics_before = metrics
+        self.printer(templ % ('CPU', '%s%% (user: %s%% system: %s%%)' % (
+            str(round(metrics[0], 2)), 
+            str(round(metrics[1], 2)), str(round(metrics[2], 2))))
+        )
 
-        self.printer(templ % ('CPU', '%i%% (user: %i%% system: %i%%)' % (
-            sum_metric[0], sum_metric[1], sum_metric[2])))
-        self.printer(templ % ('MEMORY', '%i%% (rss: %s vms: %s)' % (
-            sum_metric[3], bytes2human(sum_metric[4]), bytes2human(sum_metric[5]))))
-        self.printer(templ % ('DISK IO', 'read: %s write: %s' % (
-            bytes2human(sum_metric[5]), bytes2human(sum_metric[6]))))
-        self.printer(templ % ('NETWROK', 'recv: %s sent: %s' % (
-            bytes2human(sum_metric[7]), bytes2human(sum_metric[8]))))
+        self.printer(templ % ('MEMORY', '%s%% (rss: %s vms: %s)' % (
+                str(round(metrics[3], 2)), 
+                bytes2human(int(metrics[4])), bytes2human(int(metrics[5]))
+            ))
+        )
+
+        self.printer(templ % ('DISK IO', 'read: %s(%s/sec) write: %s(%s/sec)' % (
+                bytes2human(int(metrics[5])), bytes2human(int(delta[5])), 
+                bytes2human(int(metrics[6])), bytes2human(int(delta[6]))
+            ))
+        )
+
+        self.printer(templ % ('NETWROK', 'recv: %s(%s/sec) sent: %s(%s/sec)' % (
+                bytes2human(int(metrics[7])), bytes2human(int(delta[7])),
+                bytes2human(int(metrics[8])), bytes2human(int(delta[8]))
+            ))
+        )
         self.printer('')
+        
         
     def body(self):
         containers = self.containers
 
-        templ = '%15s %20s %30s %15s %6s %6s %15s %15s'
-        header = ('CONTAINER_ID', 'IMAGE', 'NAME', 'STATUS', 'CPU %', 'MEM %', 'DISK', 'NETWORK')
+        templ = '%15s %20s %20s %6s %6s %15s %15s'
+        header = ('CONTAINER_ID', 'IMAGE', 'NAME', 'CPU', 'MEM', 'DISK', 'NETWORK')
         self.printer(templ % header, highlight=True)
-
-        for con in containers:
-            met = con['metrics']
+        
+        for container in containers:
+            delta = None
+            metrics = container['metrics']
+            if container['Id'] in self.container_metrics_before:
+                before = self.container_metrics_before[container['Id']]
+                delta = array(metrics) - array(before)
+            else:
+                delta = [0.0] * 10
+            self.container_metrics_before[container['Id']] = metrics
 
             self.printer(templ % (
-                con['id'][:10], con['image'][-20:], con['name'], con['status'],
-                str(round(met[0], 2)) + '%', str(round(met[3], 2)) + '%',
-                '%s/%s' % (bytes2human(met[5]), bytes2human(met[6])),
-                '%s/%s' % (bytes2human(met[7]), bytes2human(met[8]))
-                ))
+                container['Id'][:10], container['Config']['Image'][-20:], container['Name'],
+                str(round(metrics[0], 2)) + '%', str(round(metrics[3], 2)) + '%',
+                '%s/%s' % (bytes2human(long(delta[5])), bytes2human(long(delta[6]))),
+                '%s/%s' % (bytes2human(long(delta[7])), bytes2human(long(delta[8])))
+                )
+            )
+        
+
+    def footer(self):
+        pass
+
+class ContainerTop(Screen):
+    def __init__(self, host, interval=1):
+        Screen.__init__(self, console=True)
+        self.interval = interval
+        self.host = host
+        self.node_metrics_before = None
+        self.container_metrics_before = {}
+
+    def start_display(self):
+        remote_url = 'http://%s:%i/node/%s/metrics' % (
+            get_preference(LIGHTTOWER_HOST),
+            get_preference(LIGHTTOWER_REMOTE_API_PORT),
+            self.host
+        )
+        print remote_url
+        while True:
+            try:
+                res = requests.get(url=remote_url)
+                if res.status_code != 200:
+                    # TODO: implement-> handle error codes
+                    print 'error'
+                
+                self.node = res.json()
+                print self.node['metrics']
+                self.containers = self.node['containers']
+                self.lineno = 0
+                self.refresh_screen()
+                time.sleep(self.interval)
+            except KeyboardInterrupt:
+                break
+    
+    def header(self):
+        metrics = self.node['metrics']
+        templ = ' %-20s: %s'
+        self.printer('RESOURCE USAGE SUMMARY', highlight=True)
+        self.printer(templ % ('HOSTNAME', self.host))
+        self.printer(templ % ('CONTAINERS', str(len(self.containers))))
+        
+        delta = None
+        if self.node_metrics_before:
+            delta = array(metrics) - array(self.node_metrics_before)
+        else:
+            delta = [0.0] * 10
+        self.node_metrics_before = metrics
+        self.printer(templ % ('CPU', '%s%% (user: %s%% system: %s%%)' % (
+            str(round(metrics[0], 2)), 
+            str(round(metrics[1], 2)), str(round(metrics[2], 2))))
+        )
+
+        self.printer(templ % ('MEMORY', '%s%% (rss: %s vms: %s)' % (
+                str(round(metrics[3], 2)), 
+                bytes2human(int(metrics[4])), bytes2human(int(metrics[5]))
+            ))
+        )
+
+        self.printer(templ % ('DISK IO', 'read: %s(%s/sec) write: %s(%s/sec)' % (
+                bytes2human(int(metrics[5])), bytes2human(int(delta[5])), 
+                bytes2human(int(metrics[6])), bytes2human(int(delta[6]))
+            ))
+        )
+
+        self.printer(templ % ('NETWROK', 'recv: %s(%s/sec) sent: %s(%s/sec)' % (
+                bytes2human(int(metrics[7])), bytes2human(int(delta[7])),
+                bytes2human(int(metrics[8])), bytes2human(int(delta[8]))
+            ))
+        )
+        self.printer('')
+        
+        
+    def body(self):
+        containers = self.containers
+
+        templ = '%15s %20s %20s %6s %6s %15s %15s'
+        header = ('CONTAINER_ID', 'IMAGE', 'NAME', 'CPU', 'MEM', 'DISK', 'NETWORK')
+        self.printer(templ % header, highlight=True)
+        
+        for container in containers:
+            delta = None
+            metrics = container['metrics']
+            if container['Id'] in self.container_metrics_before:
+                before = self.container_metrics_before[container['Id']]
+                delta = array(metrics) - array(before)
+            else:
+                delta = [0.0] * 10
+            self.container_metrics_before[container['Id']] = metrics
+
+            self.printer(templ % (
+                container['Id'][:10], container['Config']['Image'][-20:], container['Name'],
+                str(round(metrics[0], 2)) + '%', str(round(metrics[3], 2)) + '%',
+                '%s/%s' % (bytes2human(long(delta[5])), bytes2human(long(delta[6]))),
+                '%s/%s' % (bytes2human(long(delta[7])), bytes2human(long(delta[8])))
+                )
+            )
+        
 
     def footer(self):
         pass

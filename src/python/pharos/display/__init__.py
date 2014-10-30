@@ -92,6 +92,7 @@ class Top(Screen):
                 if res.json()['n'] == 0:
                     return
                 self.containers = res.json()['containers']
+                print self.containers
                 self.lineno = 0
                 self.refresh_screen()
                 time.sleep(self.interval)

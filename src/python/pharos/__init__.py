@@ -1,9 +1,15 @@
+import requests
+
 from node import Node
-import mongodb as db
-
 # TODO implement: another database or filesystem likes as db
-
-from common import (get_configuration)
+from common import (
+    get_configuration,
+    get_preference
+)
+from common import (
+    LIGHTTOWER_HOST,
+    LIGHTTOWER_REMOTE_API_PORT
+)
 
 __all__ = ['cli']
 
@@ -34,7 +40,19 @@ class PharosClient(object):
         return containers
 
     def hosts(self):
-        return db.get_hosts()
+        url = 'http://%s:%i/node' % (
+            get_preference(LIGHTTOWER_HOST),
+            get_preference(LIGHTTOWER_REMOTE_API_PORT)    
+        )
+        try:
+            res = requests.get(url)
+        except requests.exceptions.ConnectionError, e:
+            print >> sys.stderr, url + ' is not available (Connection Refused)'
+            print >> sys.stderr, 'are you start remote server?'
+        if res.status_code != 200:
+            print 'Server Error[%i]: %s' % (res.json()['return_code'], res.json()['message'])
+
+        return res.json()['nodes'] 
 
     def nodes(self):
         return [Node(host['host']) for host in self.hosts()]

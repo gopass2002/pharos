@@ -15,15 +15,14 @@ from pharos.common import (
 )
 
 from pharos.common import (
-    REMOTE_API_HOST,
-    REMOTE_API_PORT,
-    LIGHTTOWER_PORT,
-    DOCKER_BRIDGE,
-    DOCKER_PORT,
-    MONGOS_PORT
+    LIGHTTOWER_HOST, LIGHTTOWER_EVENT_COLLECT_PORT, LIGHTTOWER_REMOTE_API_PORT,
+    LIGHTKEEPER_RPC_PORT,
+    DOCKER_BRIDGE_IP, DOCKER_UNIX_SOCKET_PATH, DOCKER_REMOTE_API_PORT,
+    MONGOS_PORT,
+    METRICS_COLLECT_INTERVAL,
 )
 
-COMMANDS = ['top', 'list', 'add', 'add', 'remove', 'run']
+COMMANDS = ['container_top', 'node_top', 'list', 'add', 'add', 'remove', 'run']
 
 def _get_hostname(host):
     'if host is ip address, lookup and replace hostname'
@@ -37,20 +36,39 @@ def _get_hostname(host):
 
 def get_base_url():
     return 'http://%s:%i' % (
-        get_preference(REMOTE_API_HOST),
-        get_preference(REMOTE_API_PORT))
+        get_preference(LIGHTTOWER_HOST),
+        get_preference(LIGHTTOWER_REMOTE_API_PORT)
+    )
 
 
-top_parser = argparse.ArgumentParser()
-top_parser.add_argument('host', help='target host to display')
-@cmd(top_parser)
-def top(args):
-    'display <host> container\'s metrics'
+node_top_parser = argparse.ArgumentParser()
+node_top_parser.add_argument('host', help='target host to display')
+@cmd(node_top_parser)
+def node_top(args):
+    'display <host> node metrics'
     host = _get_hostname(args.host)
-    from pharos.window import Top
-    win = Top(host)
-    win.start_display()
+    from pharos.window import NodeTop
+    win = NodeTop(host)
+    try:
+        win.start_display()
+    except requests.exceptions.ConnectionError:
+        print 'Cannot connect pharos-remote-server'
+        exit(1)
 
+container_top_parser = argparse.ArgumentParser()
+container_top_parser.add_argument('host', help='target host to display container')
+container_top_parser.add_argument('container_id', help='target container id to display')
+@cmd(container_top_parser)
+def container_top(args):
+    'display <host> <container> metrics'
+    host = _get_hostname(args.host)
+    from pharos.window import ContainerTop
+    win = ContainerTop(host, args.container_id)
+    try:
+        win.start_display()
+    except requests.exceptions.ConnectionError:
+        print 'Cannot connect pharos-remote-server'
+        exit(1)
 
 ls_parser = argparse.ArgumentParser()
 @cmd(ls_parser)
@@ -80,14 +98,16 @@ def list(args):
         containers = node['containers']
         docker_health = 'GONE' if containers < 0 else 'OK'
         storage_health = 'GONE' if not node['storage'] else 'OK'
-        print_line(templ % (
-            node['_id'], 
-            node['host'], 
-            docker_health,
-            storage_health,
-            containers,
-            socket.gethostbyname(node['host'])
-        ))
+        print_line(
+            templ % (
+                node['_id'], 
+                node['host'], 
+                docker_health,
+                storage_health,
+                containers,
+                socket.gethostbyname(node['host'])
+            )
+        )
     print
 
 
@@ -143,38 +163,65 @@ run_parser.add_argument('-d', '--docker', action='store_true', help='run docker 
 @cmd(run_parser)
 def run(args):
     'run lightkeeper daemons'
-    remote_host = get_preference(REMOTE_API_HOST)
-    remote_port = get_preference(REMOTE_API_PORT)
-    lighttower_port = get_preference(LIGHTTOWER_PORT)
-    docker_host = get_preference(DOCKER_BRIDGE)
-    docker_port = get_preference(DOCKER_PORT)
-    mongos_port = get_preference(MONGOS_PORT)
+    envs = {}
+    envs['hostname'] = socket.gethostname()
+    envs[LIGHTTOWER_HOST] = get_preference(LIGHTTOWER_HOST)
+    envs[LIGHTTOWER_EVENT_COLLECT_PORT] = get_preference(LIGHTTOWER_EVENT_COLLECT_PORT)
+    envs[LIGHTKEEPER_RPC_PORT] = get_preference(LIGHTKEEPER_RPC_PORT)
+    envs[DOCKER_BRIDGE_IP] = get_preference(DOCKER_BRIDGE_IP)
+    envs[DOCKER_REMOTE_API_PORT] = get_preference(DOCKER_REMOTE_API_PORT)
+    envs[DOCKER_UNIX_SOCKET_PATH] = get_preference(DOCKER_UNIX_SOCKET_PATH)
+    envs[MONGOS_PORT] = get_preference(MONGOS_PORT)
+    envs[METRICS_COLLECT_INTERVAL] = get_preference(METRICS_COLLECT_INTERVAL)
 
-    url = 'http://%s:%i/node' % (remote_host, remote_port)
+    env_list = ['%s=%s' % (key.upper(), item) for (key, item) in envs.items()]
 
-    res = requests.get(url)
+    remote_api_url = 'http://%s:%i/node' % (
+            get_preference(LIGHTTOWER_HOST), 
+            get_preference(LIGHTTOWER_REMOTE_API_PORT
+        )
+    )
+
+    res = requests.get(remote_api_url)
     if res.status_code != 200:
         # TODO handle error
         print 'error'
     nodes = res.json()['nodes']
     name = 'pharos-lightkeeper'
-
+    
+    docker_port = get_preference(DOCKER_REMOTE_API_PORT)
+    docker_socket = get_preference(DOCKER_UNIX_SOCKET_PATH)
     for node in nodes:
         c = docker.Client('tcp://%s:%i' % (node['host'], docker_port))
         print 'starting lightkeeper at %s' % node['host']
+        env_pairs = ['EXT_HOSTNAME=' + node['host'], 'HOME=/pharos']
+        env_pairs.extend(env_list)
         try:
             c.inspect_container(name)
         except docker.errors.APIError:
             print 'create new container at %s' % node['host']
-            container = c.create_container('pharos',
-                environment=[
-                    'PHAROS_HOSTNAME=' + node['host'],
-                    'LIGHTTOWER_PORT=' + str(lighttower_port),
-                    'DOCKER_BRIDGE=' + docker_host,
-                    'DOCKER_PORT=' + str(docker_port),
-                    'MONGOS_PORT=' + str(mongos_port)],
+            container = c.create_container(
+                'gopass2002/pharos',
+                environment=env_pairs,
                 detach=True,
-                volumes={'/pharos/proc':'/proc'},
-                name=name)
-        c.start(name, binds={'/proc': '/pharos/proc'}, privileged=True)
+                volumes={
+                    '/pharos/proc': '/proc',
+                    '/pharos/dev/null': '/dev/null'
+                },
+                ports=[get_preference(LIGHTKEEPER_RPC_PORT)],
+                name=name
+            )
+
+        c.start(name, binds={
+                '/proc': '/pharos/proc',
+                '/dev/null': '/pharos/dev/null'
+            },
+            network_mode='host', 
+            privileged=True,
+            port_bindings={
+                get_preference(LIGHTKEEPER_RPC_PORT) : get_preference(LIGHTKEEPER_RPC_PORT)
+            }
+        )
         print 'successfully start lightkeeper'
+
+

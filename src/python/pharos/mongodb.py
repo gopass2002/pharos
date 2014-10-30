@@ -1,5 +1,6 @@
 import pymongo
-import pharos
+from common import get_preference
+from common import (DOCKER_BRIDGE, MONGOS_PORT)
 
 _client = None
 
@@ -7,8 +8,8 @@ def _get_client():
     global _client
     if not _client:
         _client = pymongo.MongoClient(
-            pharos.get_preference(pharos.DOCKER_BRIDGE), 
-            pharos.get_preference(pharos.MONGOS_PORT))
+            get_preference(DOCKER_BRIDGE), 
+            get_preference(MONGOS_PORT))
     return _client
 
 def get_hosts():

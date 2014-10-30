@@ -1,4 +1,7 @@
-from setuptools import setup, find_packages
+try:
+    from setuptools import setup
+except ImportError:
+    from distutils.core import setup
 
 pharos_src_home = 'src/python/pharos'
 
@@ -17,7 +20,6 @@ setup(
     install_requires=requirements,
     entry_points={'console_scripts': [
         'pharos = pharos.cli:main',
-        'pharos-remote-server = pharos.daemons.remote_server:main',
         'lighttower = pharos.daemons.lighttower:main',
         'lightkeeper = pharos.daemons.lightkeeper:main']
     },
