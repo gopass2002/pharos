@@ -1,9 +1,11 @@
 import json, os, sys, string, time
 import requests
 import curses, atexit
+import re
+from datetime import datetime, timedelta
+
 import psutil
 from numpy import array
-from datetime import datetime, timedelta
 
 from .common import (
     get_preference
@@ -89,7 +91,7 @@ def bytes2human(n, postfix=''):
 
 class NodeTop(Screen):
     def __init__(self, host, interval=1):
-        Screen.__init__(self, console=True)
+        Screen.__init__(self, console=False)
         self.interval = interval
         self.host = host
         self.node_metrics_before = None
@@ -186,20 +188,20 @@ class NodeTop(Screen):
         pass
 
 class ContainerTop(Screen):
-    def __init__(self, host, interval=1):
-        Screen.__init__(self, console=True)
+    def __init__(self, host, container_id, interval=1):
+        Screen.__init__(self, console=False)
         self.interval = interval
         self.host = host
-        self.node_metrics_before = None
-        self.container_metrics_before = {}
+        self.container_id = container_id
+        self.container_metrics_before = None
+        self.process_metrics_before = {}
 
     def start_display(self):
-        remote_url = 'http://%s:%i/node/%s/metrics' % (
+        remote_url = 'http://%s:%i/containers/%s/metrics' % (
             get_preference(LIGHTTOWER_HOST),
             get_preference(LIGHTTOWER_REMOTE_API_PORT),
-            self.host
+            self.container_id
         )
-        print remote_url
         while True:
             try:
                 res = requests.get(url=remote_url)
@@ -207,9 +209,7 @@ class ContainerTop(Screen):
                     # TODO: implement-> handle error codes
                     print 'error'
                 
-                self.node = res.json()
-                print self.node['metrics']
-                self.containers = self.node['containers']
+                self.container = res.json()
                 self.lineno = 0
                 self.refresh_screen()
                 time.sleep(self.interval)
@@ -217,18 +217,18 @@ class ContainerTop(Screen):
                 break
     
     def header(self):
-        metrics = self.node['metrics']
+        metrics = self.container['metrics']
         templ = ' %-20s: %s'
-        self.printer('RESOURCE USAGE SUMMARY', highlight=True)
-        self.printer(templ % ('HOSTNAME', self.host))
-        self.printer(templ % ('CONTAINERS', str(len(self.containers))))
+        self.printer('CONTAINER RESOURCE USAGE SUMMARY', highlight=True)
+        self.printer(templ % ('CONTAINER ID', self.container['Id']))
+        self.printer(templ % ('PROCESSES', str(len(self.container['processes']))))
         
         delta = None
-        if self.node_metrics_before:
-            delta = array(metrics) - array(self.node_metrics_before)
+        if self.container_metrics_before:
+            delta = array(metrics) - array(self.container_metrics_before)
         else:
             delta = [0.0] * 10
-        self.node_metrics_before = metrics
+        self.container_metrics_before = metrics
         self.printer(templ % ('CPU', '%s%% (user: %s%% system: %s%%)' % (
             str(round(metrics[0], 2)), 
             str(round(metrics[1], 2)), str(round(metrics[2], 2))))
@@ -255,30 +255,41 @@ class ContainerTop(Screen):
         
         
     def body(self):
-        containers = self.containers
+        processes = self.container['processes']
 
-        templ = '%15s %20s %20s %6s %6s %15s %15s'
-        header = ('CONTAINER_ID', 'IMAGE', 'NAME', 'CPU', 'MEM', 'DISK', 'NETWORK')
+        templ = '%-6s %-7s %-7s %-6s %-6s %-10s %-10s %-5s %-25s'
+        header = ('PID', 'VIRT', 'RES', 'CPU%', 'MEM%', 'DISK I/O', 'NET I/O', 'TASKS', 'COMMAND LINE')
         self.printer(templ % header, highlight=True)
         
-        for container in containers:
+        for proc in processes:
             delta = None
-            metrics = container['metrics']
-            if container['Id'] in self.container_metrics_before:
-                before = self.container_metrics_before[container['Id']]
+            metrics = proc['metrics']
+            if proc['pid'] in self.process_metrics_before:
+                before = self.process_metrics_before[proc['pid']]
                 delta = array(metrics) - array(before)
             else:
                 delta = [0.0] * 10
-            self.container_metrics_before[container['Id']] = metrics
+            self.process_metrics_before[proc['pid']] = metrics
 
             self.printer(templ % (
-                container['Id'][:10], container['Config']['Image'][-20:], container['Name'],
+                str(proc['pid']), bytes2human(long(metrics[5])), bytes2human(long(metrics[4])),
                 str(round(metrics[0], 2)) + '%', str(round(metrics[3], 2)) + '%',
                 '%s/%s' % (bytes2human(long(delta[5])), bytes2human(long(delta[6]))),
-                '%s/%s' % (bytes2human(long(delta[7])), bytes2human(long(delta[8])))
+                '%s/%s' % (bytes2human(long(delta[7])), bytes2human(long(delta[8]))),
+                str(proc['num_threads']), ' '.join(proc['cmdline'])
                 )
             )
+        self.printer('')
         
 
     def footer(self):
-        pass
+        self.printer('CONTAINER INFOMATION', highlight=True)
+        templ = '%-10s: %-20s %-10s: %-20s'
+        created = datetime(*map(int, re.split('[^\d]', self.container['Created'][:-4])[:-1]))
+        started = datetime(*map(int, re.split('[^\d]', self.container['State']['StartedAt'][:-4])[:-1]))
+        
+        self.printer(templ % ('HOST', self.host, 'IMAGE', self.container['Config']['Image']))
+        self.printer(templ % ('CREATED', created, 'STARTED', started))
+        self.printer('%-10s: %-20s' % ('COMMAND', '%s %s' % (self.container['Path'], ' '.join(self.container['Args']))))
+
+

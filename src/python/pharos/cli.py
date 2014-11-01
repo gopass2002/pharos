@@ -19,7 +19,7 @@ def print_help():
     print '\nUsage: pharos COMMAND [arg...]\n'
     print 'Commands:'
     for func in commands.values():
-        print '%-10s: %s' % (func.name, func.doc)
+        print '%-20s: %s' % (func.name, func.doc)
 
 
 def run_cmd(args):

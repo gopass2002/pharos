@@ -36,7 +36,7 @@ def run_rest_server(config):
 
 def monitor_events(config):
     mongos = pymongo.MongoClient('localhost', config[MONGOS_PORT])
-    col = mongos.pharos.container_metrics
+    container_metric_collection = mongos.pharos.container_metrics
 
     ctx = zmq.Context()
     monitor_sock = ctx.socket(zmq.PULL)
@@ -50,7 +50,7 @@ def monitor_events(config):
             msg = monitor_sock.recv()
             event = json.loads(msg)
             if event['status'] in END_EVENTS:
-                print 'remove', col.remove({'Id': event['id']})
+                print 'remove', container_metric_collection.remove({'Id': event['id']})
             print event
             broadcast_sock.send(msg)
     except BaseException, e:

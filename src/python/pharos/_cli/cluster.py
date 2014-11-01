@@ -22,7 +22,7 @@ from pharos.common import (
     METRICS_COLLECT_INTERVAL,
 )
 
-COMMANDS = ['container_top', 'node_top', 'list', 'add', 'add', 'remove', 'run']
+#COMMANDS = ['top_conatiner', 'top_node', 'list', 'add', 'add', 'remove', 'run', 'containers']
 
 def _get_hostname(host):
     'if host is ip address, lookup and replace hostname'
@@ -41,10 +41,10 @@ def get_base_url():
     )
 
 
-node_top_parser = argparse.ArgumentParser()
-node_top_parser.add_argument('host', help='target host to display')
-@cmd(node_top_parser)
-def node_top(args):
+top_node_parser = argparse.ArgumentParser()
+top_node_parser.add_argument('host', help='target host to display')
+@cmd(top_node_parser)
+def top_node(args):
     'display <host> node metrics'
     host = _get_hostname(args.host)
     from pharos.window import NodeTop
@@ -55,11 +55,11 @@ def node_top(args):
         print 'Cannot connect pharos-remote-server'
         exit(1)
 
-container_top_parser = argparse.ArgumentParser()
-container_top_parser.add_argument('host', help='target host to display container')
-container_top_parser.add_argument('container_id', help='target container id to display')
-@cmd(container_top_parser)
-def container_top(args):
+top_container_parser = argparse.ArgumentParser()
+top_container_parser.add_argument('host', help='target host to display container')
+top_container_parser.add_argument('container_id', help='target container id to display')
+@cmd(top_container_parser)
+def top_container(args):
     'display <host> <container> metrics'
     host = _get_hostname(args.host)
     from pharos.window import ContainerTop
@@ -70,9 +70,53 @@ def container_top(args):
         print 'Cannot connect pharos-remote-server'
         exit(1)
 
-ls_parser = argparse.ArgumentParser()
-@cmd(ls_parser)
-def list(args):
+
+containers_parser = argparse.ArgumentParser()
+containers_parser.add_argument('host', nargs='?', help='specify host to display')
+containers_parser.add_argument('-a', '--all', action='store_true', default=False, help='show all containers')
+containers_parser.add_argument('-q', '--quiet', action='store_true', default=False, help='only display numeric IDs')
+@cmd(containers_parser)
+def containers(args):
+    'list containers'
+    base_url = get_base_url()
+    url = base_url + '/containers?'
+
+    if args.host:
+        url += 'host=' + args.host + '&'
+    if args.all:
+        url += 'all=true&'
+    if args.quiet:
+        url += 'quiet=true&'
+
+    try:
+        res = requests.get(url)
+    except requests.exceptions.ConnectionError, e:
+        print >> sys.stderr, url + ' is not available (Connection Refused)'
+        print >> sys.stderr, 'are you start remote server?'
+        exit(1)
+
+    if res.status_code != 200:
+        print 'Server Error[%i]: %s' % (res.json()['return_code'], res.json()['message'])
+        exit(0)
+
+    containers = res.json()['containers']
+    templ = '%-12s    %-20s   %-25s    %-10s  %-25s    %-15s'
+    header = ('CONTAINER ID', 'IMAGE', 'COMMNAD', 'STATUS', 'NAMES', 'HOST')
+    print_line(templ % header, highlight=True)
+    for container in containers:
+        cmd = '"%s %s"' % (container['Path'], ' '.join(container['Args']))
+        status = 'running' if container['State']['Running'] else 'stopped'
+        
+        row = (
+            container['Id'][:12], container['Config']['Image'], 
+            cmd[:25], status, container['Name'][:25], container['hostname']
+        )
+        print_line(templ % row)
+            
+
+nodes_parser = argparse.ArgumentParser()
+@cmd(nodes_parser)
+def nodes(args):
     'list nodes'
     base_url = get_base_url()
     url = base_url + '/node'
@@ -111,10 +155,10 @@ def list(args):
     print
 
 
-add_parser = argparse.ArgumentParser()
-add_parser.add_argument('host', help='to add hostname')
-@cmd(add_parser)
-def add(args):
+add_node_parser = argparse.ArgumentParser()
+add_node_parser.add_argument('host', help='to add hostname')
+@cmd(add_node_parser)
+def add_node(args):
     'add node'
     base_url = get_base_url()
     url = base_url + '/node'
@@ -133,10 +177,10 @@ def add(args):
     else:
         print res.json()['_id']
 
-remove_parser = argparse.ArgumentParser()
-remove_parser.add_argument('host', help='to remove hostname')
-@cmd(remove_parser)
-def remove(args):
+remove_node_parser = argparse.ArgumentParser()
+remove_node_parser.add_argument('host', help='to remove hostname')
+@cmd(remove_node_parser)
+def remove_node(args):
     'remove node'
     base_url = get_base_url()
     url = base_url + '/node'
@@ -156,12 +200,12 @@ def remove(args):
     print res.json()['_id']
 
 
-run_parser = argparse.ArgumentParser()
-run_parser.add_argument('hostname', nargs='*', help='to run hosts')
-run_parser.add_argument('-a', '--all', action='store_true', default=True, help='run all hosts')
-run_parser.add_argument('-d', '--docker', action='store_true', help='run docker daemon')
-@cmd(run_parser)
-def run(args):
+daemon_parser = argparse.ArgumentParser()
+daemon_parser.add_argument('hostname', nargs='*', help='to run hosts')
+daemon_parser.add_argument('-a', '--all', action='store_true', default=True, help='run all hosts')
+daemon_parser.add_argument('-d', '--docker', action='store_true', help='run docker daemon')
+@cmd(daemon_parser)
+def daemon(args):
     'run lightkeeper daemons'
     envs = {}
     envs['hostname'] = socket.gethostname()

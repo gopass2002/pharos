@@ -97,6 +97,3 @@ def metrics_node(host=None):
     res['_id'] = str(res.pop('_id'))
     return flask.jsonify(res)
 
-@app.route('/containers/<container_id>/metrics', methods=['GET'])
-def metrics_container(container_id):
-    pass
