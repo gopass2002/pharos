@@ -4,5 +4,5 @@
 
 pharos
 ======
-
+#### pharos web interface (https://github.com/DockerKorea/pharos-web)
 Distributed Docker Monitoring Tool
