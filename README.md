@@ -27,7 +27,9 @@ Main Features
 $ git clone https://github.com/DockerKorea/pharos.git
 $ cd pharos    
 $ python setup.py install  
-or (The install way above might not work appropriately. So, please use environment variables in order to install it.)
+# or (The install way above might not work appropriately. 
+#      So, please use environment variables in order to install it.)
+$ pip install -r requirements.txt
 $ export PYTHONPATH=<Pharos home dir>/src/python
 $ export PATH=<Pharos home dir>/bin
 ```
