@@ -43,12 +43,13 @@ def get_base_url():
 
 top_node_parser = argparse.ArgumentParser()
 top_node_parser.add_argument('host', help='target host to display')
+top_node_parser.add_argument('-b', '--batch', action='store_true', help='display batch mode')
 @cmd(top_node_parser)
 def top_node(args):
     'display <host> node metrics'
     host = _get_hostname(args.host)
     from pharos.window import NodeTop
-    win = NodeTop(host)
+    win = NodeTop(host, console=args.batch)
     try:
         win.start_display()
     except requests.exceptions.ConnectionError:
@@ -58,12 +59,13 @@ def top_node(args):
 top_container_parser = argparse.ArgumentParser()
 top_container_parser.add_argument('host', help='target host to display container')
 top_container_parser.add_argument('container_id', help='target container id to display')
+top_container_parser.add_argument('-b', '--batch', action='store_true', help='display batch mode')
 @cmd(top_container_parser)
 def top_container(args):
     'display <host> <container> metrics'
     host = _get_hostname(args.host)
     from pharos.window import ContainerTop
-    win = ContainerTop(host, args.container_id)
+    win = ContainerTop(host, args.container_id, console=args.batch)
     try:
         win.start_display()
     except requests.exceptions.ConnectionError:
@@ -100,7 +102,7 @@ def containers(args):
         exit(0)
 
     containers = res.json()['containers']
-    templ = '%-12s    %-20s   %-25s    %-10s  %-25s    %-15s'
+    templ = '%-12s    %-40s   %-25s    %-10s  %-25s    %-15s'
     header = ('CONTAINER ID', 'IMAGE', 'COMMNAD', 'STATUS', 'NAMES', 'HOST')
     print_line(templ % header, highlight=True)
     for container in containers:

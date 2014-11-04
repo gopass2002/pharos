@@ -1,12 +1,14 @@
-
 import pymongo
 import flask
+from flask.ext.cors import CORS
 
 from pharos.common import get_preference
 from pharos.common import MONGOS_PORT
 
 __VIEWS__ = ['node', 'container']
 app = flask.Flask(__name__)
+CORS(app)
+
 _mongos = None
 
 class InvalidUsage(Exception):

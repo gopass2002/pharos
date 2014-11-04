@@ -90,8 +90,8 @@ def bytes2human(n, postfix=''):
 
 
 class NodeTop(Screen):
-    def __init__(self, host, interval=1):
-        Screen.__init__(self, console=False)
+    def __init__(self, host, interval=1, console=False):
+        Screen.__init__(self, console=console)
         self.interval = interval
         self.host = host
         self.node_metrics_before = None
@@ -135,7 +135,7 @@ class NodeTop(Screen):
         self.node_metrics_before = metrics
         self.printer(templ % ('CPU', '%s%% (user: %s%% system: %s%%)' % (
             str(round(metrics[0], 2)), 
-            str(round(metrics[1], 2)), str(round(metrics[2], 2))))
+            str(round(metrics[1]/100, 2)), str(round(metrics[2]/100, 2))))
         )
 
         self.printer(templ % ('MEMORY', '%s%% (rss: %s vms: %s)' % (
@@ -161,7 +161,7 @@ class NodeTop(Screen):
     def body(self):
         containers = self.containers
 
-        templ = '%15s %20s %20s %6s %6s %15s %15s'
+        templ = '%15s %30s %30s %6s %6s %15s %15s'
         header = ('CONTAINER_ID', 'IMAGE', 'NAME', 'CPU', 'MEM', 'DISK', 'NETWORK')
         self.printer(templ % header, highlight=True)
         
@@ -176,7 +176,7 @@ class NodeTop(Screen):
             self.container_metrics_before[container['Id']] = metrics
 
             self.printer(templ % (
-                container['Id'][:10], container['Config']['Image'][-20:], container['Name'],
+                container['Id'][:10], container['Config']['Image'][-25:], container['Name'][1:],
                 str(round(metrics[0], 2)) + '%', str(round(metrics[3], 2)) + '%',
                 '%s/%s' % (bytes2human(long(delta[5])), bytes2human(long(delta[6]))),
                 '%s/%s' % (bytes2human(long(delta[7])), bytes2human(long(delta[8])))
@@ -188,8 +188,8 @@ class NodeTop(Screen):
         pass
 
 class ContainerTop(Screen):
-    def __init__(self, host, container_id, interval=1):
-        Screen.__init__(self, console=False)
+    def __init__(self, host, container_id, interval=1, console=False):
+        Screen.__init__(self, console=console)
         self.interval = interval
         self.host = host
         self.container_id = container_id
@@ -231,7 +231,7 @@ class ContainerTop(Screen):
         self.container_metrics_before = metrics
         self.printer(templ % ('CPU', '%s%% (user: %s%% system: %s%%)' % (
             str(round(metrics[0], 2)), 
-            str(round(metrics[1], 2)), str(round(metrics[2], 2))))
+            str(round(metrics[1]/100, 2)), str(round(metrics[2]/100, 2))))
         )
 
         self.printer(templ % ('MEMORY', '%s%% (rss: %s vms: %s)' % (
