@@ -6,8 +6,7 @@ pharos
 ======
 pharos is a management tool to control and monitor 'Containers' of Docker(https://www.docker.com/) on a distributed cluster.
 
-Main Features
-  - 
+##### Main Features
   - An interface, provided as RESTful API by LightTower in order to monitor metrics (CPU, Memory, Disk I/O, Network I/O) of Container(s) of each process on a distributed system (These metrics are collected by LightKeeper).
     - Command Line Interface & Web Interface (not implemented yet: pharos web interface (https://github.com/DockerKorea/pharos-web)
   - An API wrapping pub&sub model (of ZeroMQ) for life cycle events such as start, die, kill and stop of Containers, and Alert event which is given as resources are used unormally out of thier limits set by users with the metrics.
@@ -17,6 +16,7 @@ Main Features
 
 #####pharos docker hub repository (https://registry.hub.docker.com/u/gopass2002/pharos)
 
+---
 
 #### requirements
 - mongodb
@@ -72,7 +72,7 @@ $ bin/pharos
 Usage: pharos COMMAND [arg...]
 
 Commands:
-daemon              : run lightkeeper daemons
+run              : run lightkeeper daemons
 add_node            : add node
 top_container       : display <host> <container> metrics
 top_node            : display <host> node metrics
@@ -112,6 +112,16 @@ starting lightkeeper at ubuntu-dev
 successfully start lightkeeper
 ```
 
+#### List Containers
+List containers
+```
+containers
+CONTAINER ID    IMAGE                                      COMMNAD                      STATUS      NAMES                        HOST
+0e373b8a5b24    ubuntu                                     "ping 8.8.8.8"               running     /grave_elion                 ubuntu-dev
+2a0855496d3c    stress                                     "bash "                      running     /berserk_bell                ubuntu-dev
+9c6f047d0ccd    gopass2002/pharos                          "/bin/sh -c /pharos/bin/l    running     /pharos-lightkeeper          ubuntu-dev
+```
+
 #### Monitor Node Metrics
 Monitor the summery of metrics being used by Containers running on nodes
 ```
@@ -119,61 +129,54 @@ $ bin/pharos top_node ubuntu-dev
 
 RESOURCE USAGE SUMMARY
  HOSTNAME            : ubuntu-dev
- CONTAINERS          : 9
- CPU                 : 96.7% (user: 4.01% system: 7.36%)
- MEMORY              : 12.97% (rss: 1G vms: 3G)
- DISK IO             : read: 3G(0B/sec) write: 47M(0B/sec)
- NETWROK             : recv: 0B(0B/sec) sent: 6G(0B/sec)
+ CONTAINERS          : 3
+ CPU                 : 1.8% (user: 0.05% system: 0.19%)
+ MEMORY              : 0.99% (rss: 79M vms: 550M)
+ DISK IO             : read: 550M(0B/sec) write: 10M(0B/sec)
+ NETWROK             : recv: 0B(0B/sec) sent: 221G(72K/sec)
 
-   CONTAINER_ID                IMAGE                 NAME    CPU    MEM            DISK         NETWORK
-     1d4deacc17               stress      /dreamy_meitner  15.2%  2.17%           0B/0B           0B/0B
-     3bf9041389    gopass2002/pharos  /pharos-lightkeeper   4.9%   1.2%           0B/0B           0B/0B
-     3fdb6c2926               stress        /jovial_mayer   0.0%   0.3%           0B/0B           0B/0B
-     49dea14195               stress  /stupefied_lovelace  16.9%  1.33%           0B/0B           0B/0B
-     5ed4e65d22               stress        /happy_wilson   0.0%  1.22%           0B/0B           0B/0B
-     65c92d0ce8               stress      /focused_euclid  15.0%  1.49%           0B/0B           0B/0B
-     66e3e7adc3               stress      /berserk_mclean  15.2%  1.65%           0B/0B           0B/0B
-     76030a48af               stress   /nostalgic_feynman  14.3%  2.11%           0B/0B           0B/0B
-     b95f1bbe89               stress     /furious_wozniak  15.2%  1.49%           0B/0B           0B/0B
+   CONTAINER_ID                          IMAGE                           NAME    CPU    MEM            DISK         NETWORK
+     0e373b8a5b                         ubuntu                    grave_elion   0.0%  0.01%           0B/0B          0B/98B
+     2a0855496d                         stress                   berserk_bell   0.0%  0.05%           0B/0B           0B/0B
+     9c6f047d0c              gopass2002/pharos             pharos-lightkeeper   1.8%  0.93%           0B/0B          0B/72K
      
 ```
 
 #### Monitor Container Metrics
 Monitor the metrics used by a certain Container (per process)
 ```
-$ bin/pharos top_container ubuntu-dev 172c72072f03
+$ bin/pharos top_container 2a0855496d
 
 CONTAINER RESOURCE USAGE SUMMARY
- CONTAINER ID        : 172c72072f033773261c91da544cbfb58e2d6238770989859bbfcd15f98e1c53
- PROCESSES           : 19
- CPU                 : 172.2% (user: 3.89% system: 3.54%)
- MEMORY              : 1.13% (rss: 90M vms: 417M)
- DISK IO             : read: 417M(0B/sec) write: 4M(0B/sec)
- NETWROK             : recv: 0B(0B/sec) sent: 116K(1K/sec)
+ CONTAINER ID        : 2a0855496d3ccd55dd8d0566aae6ddccc85a3419ddb22d3a7be5a671aa0fe7f7
+ PROCESSES           : 18
+ CPU                 : 137.8% (user: 0.06% system: 0.08%)
+ MEMORY              : 2.53% (rss: 201M vms: 411M)
+ DISK IO             : read: 411M(0B/sec) write: 6M(0B/sec)
+ NETWROK             : recv: 0B(0B/sec) sent: 152M(0B/sec)
 
-PID    VIRT    RES     CPU%   MEM%   DISK I/O   NET I/O    TASKS COMMAND LINE
-26491  17M     1M      0.0%   0.02%  0B/0B      0B/98B     1     bash
-27056  6M      636K    0.0%   0.01%  0B/0B      0B/98B     1     ping 8.8.8.8
-27329  12M     256K    0.0%   0.0%   0B/0B      0B/98B     1     nsenter-exec --nspid 26491 --console /dev/pts/9 -- bash
-27330  17M     1M      0.0%   0.02%  0B/0B      0B/98B     1     bash
-27434  7M      636K    0.0%   0.01%  0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27435  7M      100K    13.4%  0.0%   0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27436  7M      100K    12.5%  0.0%   0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27437  135M    83M     14.3%  1.05%  0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27438  7M      100K    11.6%  0.0%   0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27439  7M      100K    12.5%  0.0%   0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27440  135M    288K    10.8%  0.0%   0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27441  7M      100K    10.8%  0.0%   0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27442  7M      100K    12.5%  0.0%   0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27443  7M      100K    11.7%  0.0%   0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27444  7M      100K    12.6%  0.0%   0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27445  7M      100K    11.7%  0.0%   0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27446  7M      100K    11.7%  0.0%   0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27447  7M      100K    13.5%  0.0%   0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
-27448  7M      100K    12.6%  0.0%   0B/0B      0B/98B     1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 20s
+PID    VIRT    RES     CPU%   MEM%   TASKS COMMAND LINE
+6464   12M     256K    0.0%   0.0%   1     nsenter-exec --nspid 30858 --console /dev/pts/13 -- bash
+6466   17M     1M      0.0%   0.02%  1     bash
+12350  7M      636K    0.0%   0.01%  1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12351  7M      100K    19.1%  0.0%   1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12352  7M      100K    6.9%   0.0%   1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12353  135M    92M     7.8%   1.16%  1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12354  7M      100K    6.9%   0.0%   1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12355  7M      100K    7.8%   0.0%   1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12356  135M    102M    7.8%   1.29%  1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12357  7M      100K    6.9%   0.0%   1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12358  7M      100K    7.8%   0.0%   1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12359  7M      100K    6.9%   0.0%   1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12360  7M      100K    6.9%   0.0%   1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12361  7M      100K    19.1%  0.0%   1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12362  7M      100K    7.8%   0.0%   1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12363  7M      100K    7.0%   0.0%   1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+12364  7M      100K    19.1%  0.0%   1     stress --cpu 8 --io 4 --vm 2 --vm-bytes 128M --timeout 50s
+30858  17M     1M      0.0%   0.02%  1     bash
 
 CONTAINER INFOMATION
 HOST      : ubuntu-dev           IMAGE     : stress
-CREATED   : 2014-11-03 11:33:44  STARTED   : 2014-11-03 11:33:44
+CREATED   : 2014-11-05 07:39:05  STARTED   : 2014-11-05 07:39:05
 COMMAND   : bash
 ```
