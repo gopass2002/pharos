@@ -1,6 +1,5 @@
 import os
 import yaml
-import fcntl, termios, struct
 
 # config headers
 HEADER_PHAROS = 'pharos'
@@ -109,27 +108,3 @@ def get_preference(field):
     if field not in CONFIG_FIELDS:
         raise Exception('%s is invaild field name' % field)
     return _get_preference(field, get_configuration())
-
-def terminal_size():
-    h, w, hp, wp = struct.unpack('HHHH',
-        fcntl.ioctl(0, termios.TIOCGWINSZ,
-        struct.pack('HHHH', 0, 0, 0, 0)))
-    return w, h
-
-def print_divider(char='-', highlight=False):
-    max_w, max_h = terminal_size()
-    print_line(char * max_w, highlight=highlight)
-
-def print_line(line, highlight=False):
-     max_w, max_h = terminal_size()
-     if len(line) > max_w:  
-        if highlight:  
-            print '\033[1m' + line[:max_w] + '\033[0m'
-        else:
-            print line[:max_w]
-            
-     else:  
-        if highlight:
-            print '\033[1m' + line + '\033[0m'
-        else:
-            print line

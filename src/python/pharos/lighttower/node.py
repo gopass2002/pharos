@@ -10,11 +10,7 @@ import pymongo
 import docker
 
 # pharos modules
-from pharos.common import get_preference
-from pharos.common import (
-    DOCKER_REMOTE_API_PORT,
-    MONGOS_PORT
-)
+import pharos.config as config
 
 from . import (
     InvalidUsage,
@@ -51,7 +47,7 @@ def check_storage_status(host, port):
     except pymongo.errors.ConnectionFailure:
         return False
 
-@app.route('/node', methods=['GET', 'POST', 'DELETE'])
+@app.route('/nodes', methods=['GET', 'POST', 'DELETE'])
 def list_node():
     try:
         c = pymongo.MongoClient('localhost:27017') 
@@ -60,39 +56,39 @@ def list_node():
     if request.method == 'POST':
         # insert new recode
         req = json.loads(request.data)
-        res = c.pharos.node.find_one(req)
+        res = c.pharos.nodes.find_one(req)
         if res:
             # return conflict current recode: 409
             raise AlreadyExists(res, status_code=409)
-        res = c.pharos.node.insert(req)
+        res = c.pharos.nodes.insert(req)
         if not res:
             pass
         req['_id'] = str(req.pop('_id'))
         return flask.jsonify(req)
     elif request.method == 'DELETE':
         req = json.loads(request.data)
-        res = c.pharos.node.find_one(req)
+        res = c.pharos.nodes.find_one(req)
         if not res:
             raise NotFoundRecord(res, status_code=404)
-        c.pharos.node.remove(res)
+        c.pharos.nodes.remove(res)
         res['_id'] = str(res.pop('_id'))
         return flask.jsonify(res)
 
-    nodes = list(c.pharos.node.find())
+    nodes = list(c.pharos.nodes.find())
     res = {'n': len(nodes)}
     for node in nodes:
         node['_id'] = str(node.pop('_id'))
         host = node['host']
         # health check
-        node['containers'] = get_containers_count(host, get_preference(DOCKER_REMOTE_API_PORT))
-        node['storage'] = check_storage_status(host, get_preference(MONGOS_PORT))
+        node['containers'] = get_containers_count(host, config.get_preference(config.DOCKER_REMOTE_API_PORT))
+        node['storage'] = check_storage_status(host, config.get_preference(config.MONGOS_PORT))
     res['nodes'] = nodes
     return flask.jsonify(res)
 
-@app.route('/node/<host>/metrics', methods=['GET'])
+@app.route('/nodes/<host>/metrics', methods=['GET'])
 def metrics_node(host=None):
-    c = pymongo.MongoClient('%s:%i' % (socket.gethostname(), get_preference(MONGOS_PORT)))
-    q = {'hostname': host}
+    c = pymongo.MongoClient('%s:%i' % (socket.gethostname(), config.get_preference(config.MONGOS_PORT)))
+    q = {'Host': host}
     res = c.pharos.node_metrics.find_one(q)
     res['_id'] = str(res.pop('_id'))
     return flask.jsonify(res)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from pharos.daemons import lightkeeper
+import pharos.lightkeeper.main as lightkeeper
 
 if __name__ == '__main__':
     lightkeeper.main()

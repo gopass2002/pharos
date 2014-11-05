@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from pharos.daemons import lighttower
+from pharos.lighttower import main as lighttower
 
 if __name__ == '__main__':
     lighttower.main()

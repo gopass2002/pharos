@@ -1,5 +1,5 @@
 #!/usr/bin/env python
 
 if __name__ == '__main__':
-    import pharos.cli
-    pharos.cli.main()
+    from pharos.cli import main
+    main.main()

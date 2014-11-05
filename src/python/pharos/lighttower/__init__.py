@@ -2,8 +2,7 @@ import pymongo
 import flask
 from flask.ext.cors import CORS
 
-from pharos.common import get_preference
-from pharos.common import MONGOS_PORT
+import pharos.config as config
 
 __VIEWS__ = ['node', 'container']
 app = flask.Flask(__name__)
@@ -38,5 +37,5 @@ def get_mongo_client():
     global _mongos
 
     if not _mongos:
-        _mongos = pymongo.MongoClient('localhost', get_preference(MONGOS_PORT))
+        _mongos = pymongo.MongoClient('localhost', config.get_preference(config.MONGOS_PORT))
     return _mongos

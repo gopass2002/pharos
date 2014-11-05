@@ -1,17 +1,16 @@
 import argparse
 import sys
-import _cli
+import pharos.cli
 
 commands = {}
 
-
 def load_commands():
-    for name in _cli.__all__:
-        __import__('pharos._cli.%s' % name)
-        mod = getattr(_cli, name)
-        for member in dir(getattr(_cli, name)):
+    for name in pharos.cli.__all__:
+        __import__('pharos.cli.%s' % name)
+        mod = getattr(pharos.cli, name)
+        for member in dir(getattr(pharos.cli, name)):
             attr = getattr(mod, member)
-            if isinstance(attr,_cli.CommandWrapper):
+            if isinstance(attr,pharos.cli.CommandWrapper):
                 commands[member] = attr
 
 

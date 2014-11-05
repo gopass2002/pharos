@@ -1,7 +1,6 @@
 import os
 import sys
 
-
 __all__ = ['cluster']
 
 def progname(module, command):
