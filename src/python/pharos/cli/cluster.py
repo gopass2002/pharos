@@ -109,7 +109,7 @@ nodes_parser = argparse.ArgumentParser()
 def nodes(args):
     'list nodes'
     base_url = get_base_url()
-    url = base_url + '/node'
+    url = base_url + '/nodes'
     
     try:
         res = requests.get(url)
@@ -151,7 +151,7 @@ add_node_parser.add_argument('host', help='to add hostname')
 def add_node(args):
     'add node'
     base_url = get_base_url()
-    url = base_url + '/node'
+    url = base_url + '/nodes'
     payload = {'host': args.host}
     headers = {'content-type': 'application/json'}
 
@@ -173,7 +173,7 @@ remove_node_parser.add_argument('host', help='to remove hostname')
 def remove_node(args):
     'remove node'
     base_url = get_base_url()
-    url = base_url + '/node'
+    url = base_url + '/nodes'
     payload = {'host': args.host}
     headers = {'content-type': 'application/json'}
 

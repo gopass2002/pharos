@@ -46,6 +46,7 @@ def monitor_events(conf, docker_client, mongos):
             print 'remove container metrics', container_metrics_col.remove({'Id': container_id})
             # update container laste status to container
             inspect = docker_client.inspect_container(container_id)
+            inspect['Host'] = conf['hostname']  # add hostname
             print 'update container status', containers_col.update({'Id': inspect['Id']}, inspect, True)
         elif status == 'destroy':
             # remove container record from containers
