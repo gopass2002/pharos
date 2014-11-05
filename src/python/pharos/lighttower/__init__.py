@@ -4,7 +4,7 @@ from flask.ext.cors import CORS
 
 import pharos.config as config
 
-__VIEWS__ = ['node', 'container']
+__VIEWS__ = ['node', 'container', 'event']
 app = flask.Flask(__name__)
 CORS(app)
 

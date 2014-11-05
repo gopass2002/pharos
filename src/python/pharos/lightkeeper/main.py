@@ -34,6 +34,7 @@ def monitor_events(conf, docker_client, mongos):
     # container event monitor process
     for e in docker_client.events():
         event = json.loads(e)
+        event['Host'] = conf['hostname']
         status = event['status']
         container_id = event['id']
         

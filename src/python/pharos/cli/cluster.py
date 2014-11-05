@@ -3,6 +3,7 @@ import sys
 import socket
 import re
 import json
+import datetime
 
 import requests
 import docker
@@ -189,6 +190,37 @@ def remove_node(args):
 
     print res.json()['_id']
 
+event_parser = argparse.ArgumentParser()
+event_parser.add_argument('container_id', nargs='?', help='filtering by container id')
+event_parser.add_argument('-s', '--status', type=str, help='filtering by status')
+@cmd(event_parser)
+def events(args):
+    'show container lifecycle events'
+    base_url = get_base_url()
+    url = base_url + '/events?'
+
+    if args.container_id:
+        url += 'id=' + args.container_id + '&'
+    if args.status:
+        url += 'status=' + args.status
+    
+    try:
+        res = requests.get(url)
+    except requests.exceptions.ConnectionError, e:
+        print >> sys.stderr, url + ' is not available (Connection Refused)'
+        print >> sys.stderr, 'are you start remote server?'
+        exit(1)
+
+    events = res.json()
+
+    templ = '%-12s    %-40s    %-10s    %-15s    %-15s'
+    header = ('CONTAINER ID', 'IMAGE', 'STATUS', 'HOST', 'TIME')
+    print_line(templ % header, highlight=True)
+
+    for event in events['events']:
+        time = datetime.datetime.fromtimestamp(event['time']).strftime('%Y-%m-%d %H:%M:%S')
+        row = templ % (event['id'][:10], event['from'], event['status'], event['Host'], time)
+        print_line(row)
 
 run_parser = argparse.ArgumentParser()
 run_parser.add_argument('hostname', nargs='*', help='to run hosts')
@@ -256,5 +288,3 @@ def run(args):
             }
         )
         print 'successfully start lightkeeper'
-
-
