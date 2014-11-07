@@ -11,17 +11,25 @@ with open('requirements.txt', 'r') as f:
 setup(
     name='pharos',
     version='0.1',
-    packages=['pharos', 'pharos._cli', 'pharos.rest', 'pharos.daemons'],
+    packages=[
+        'pharos', 'pharos.cli', 'pharos.common', 
+        'pharos.display', 'pharos.lightkeeper', 'pharos.lighttower', 
+        'pharos.storage'
+    ],
     package_dir={
         'pharos': pharos_src_home,
-        'pharos._cli': pharos_src_home + '/_cli',
-        'pharos.rest': pharos_src_home + '/rest',
-        'pharos.daemons': pharos_src_home + '/daemons'},
+        'pharos.cli': pharos_src_home + '/cli',
+        'pharos.common': pharos_src_home + '/common',
+        'pharos.display': pharos_src_home + '/display',
+        'pharos.lightkeeper': pharos_src_home + '/lightkeeper',
+        'pharos.lighttower': pharos_src_home + '/lighttower',
+        'pharos.storage': pharos_src_home + '/storage'
+    },
     install_requires=requirements,
     entry_points={'console_scripts': [
-        'pharos = pharos.cli:main',
-        'lighttower = pharos.daemons.lighttower:main',
-        'lightkeeper = pharos.daemons.lightkeeper:main']
+        'pharos = pharos.cli.main:main',
+        'lighttower = pharos.lighttower.main:main',
+        'lightkeeper = pharos.lightkeeper.lightkeeper:main']
     },
     zip_safe=False,
     author='DockerKorea',
